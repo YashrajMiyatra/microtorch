@@ -77,3 +77,48 @@ class Adam(Optimizer):
 
                 # Update parameter
                 p._flat[i] -= self.lr * m_hat / (math.sqrt(v_hat) + self.eps)
+
+
+class AdamW(Optimizer):
+    """AdamW Optimizer with decoupled weight decay."""
+
+    def __init__(
+        self,
+        params: List[Parameter],
+        lr: float = 0.001,
+        betas: Tuple[float, float] = (0.9, 0.999),
+        eps: float = 1e-8,
+        weight_decay: float = 0.01,
+    ) -> None:
+        super().__init__(params, lr)
+        self.beta1, self.beta2 = betas
+        self.eps = eps
+        self.weight_decay = weight_decay
+        self.m = [[0.0] * len(p._flat) for p in self.params]
+        self.v = [[0.0] * len(p._flat) for p in self.params]
+        self.t = 0
+
+    def step(self) -> None:
+        self.t += 1
+        for idx, p in enumerate(self.params):
+            if p.grad is None:
+                continue
+            m = self.m[idx]
+            v = self.v[idx]
+            for i in range(len(p._flat)):
+                grad = p.grad._flat[i]
+                # Decoupled weight decay
+                if self.weight_decay != 0.0:
+                    p._flat[i] -= self.lr * self.weight_decay * p._flat[i]
+
+                # Update biased 1st and 2nd moment estimates
+                m[i] = self.beta1 * m[i] + (1.0 - self.beta1) * grad
+                v[i] = self.beta2 * v[i] + (1.0 - self.beta2) * (grad ** 2)
+
+                # Compute bias-corrected moments
+                m_hat = m[i] / (1.0 - (self.beta1 ** self.t))
+                v_hat = v[i] / (1.0 - (self.beta2 ** self.t))
+
+                # Update parameter
+                p._flat[i] -= self.lr * m_hat / (math.sqrt(v_hat) + self.eps)
+
