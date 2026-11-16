@@ -1,7 +1,7 @@
 import unittest
 from microtorch.tensor import Tensor
 from microtorch.nn import Linear, Sequential, ReLU, MSELoss
-from microtorch.optim import SGD
+from microtorch.optim import SGD, AdamW
 
 
 class TestNeuralNetwork(unittest.TestCase):
@@ -15,6 +15,26 @@ class TestNeuralNetwork(unittest.TestCase):
         loss.backward()
         self.assertIsNotNone(fc.weight.grad)
         self.assertEqual(fc.weight.grad.shape, (2, 3))
+
+    def test_adamw_optimizer(self):
+        model = Sequential(Linear(2, 4), ReLU(), Linear(4, 1))
+        optimizer = AdamW(model.parameters(), lr=0.01, weight_decay=0.01)
+        criterion = MSELoss()
+
+        x = Tensor([[1.0, 1.0]])
+        y = Tensor([[2.0]])
+
+        pred0 = model(x)
+        loss0 = criterion(pred0, y).item()
+
+        optimizer.zero_grad()
+        loss = criterion(model(x), y)
+        loss.backward()
+        optimizer.step()
+
+        pred1 = model(x)
+        loss1 = criterion(pred1, y).item()
+        self.assertLess(loss1, loss0)
 
     def test_sequential_training_step(self):
         model = Sequential(Linear(2, 4), ReLU(), Linear(4, 1))
