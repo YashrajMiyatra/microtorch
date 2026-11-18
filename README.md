@@ -27,7 +27,7 @@ Most tutorials implement scalar-only autograd (like Andrej Karpathy's `micrograd
 - ⚡ **Reverse-Mode Autograd**: Dynamic computation graph construction with topological sort backpropagation.
 - 📐 **Batched Matrix Operations**: Matrix multiplication (`@`), broadcasting, and reductions (`sum`, `mean`).
 - 🧠 **PyTorch-Style `nn` Library**: `Module`, `Parameter`, `Linear`, `Sequential`, `ReLU`, `Sigmoid`, `Tanh`, `MSELoss`, and `CrossEntropyLoss`.
-- 🚀 **First-Class Optimizers**: `SGD` (with momentum) and `Adam` (with adaptive moments and bias correction).
+- 🚀 **First-Class Optimizers**: `SGD` (with momentum), `Adam`, and `AdamW` (with decoupled weight decay).
 - 📊 **Visual Computation Graphs**: Trace and render computational DAGs in ASCII trees or GitHub-ready Mermaid diagrams.
 - 🧪 **100% Zero Dependencies**: Runs out of the box with standard Python 3.
 
