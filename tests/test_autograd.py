@@ -37,5 +37,21 @@ class TestAutograd(unittest.TestCase):
         self.assertEqual(x.grad.data, [0.0, 1.0, 1.0])
 
 
+    def test_tanh_gradient(self):
+        x = Tensor(0.0, requires_grad=True)
+        y = x.tanh()
+        y.backward()
+        self.assertAlmostEqual(y.item(), 0.0)
+        self.assertAlmostEqual(x.grad.item(), 1.0)
+
+    def test_sigmoid_gradient(self):
+        x = Tensor(0.0, requires_grad=True)
+        y = x.sigmoid()
+        y.backward()
+        self.assertAlmostEqual(y.item(), 0.5)
+        self.assertAlmostEqual(x.grad.item(), 0.25)
+
+
 if __name__ == "__main__":
+
     unittest.main()
