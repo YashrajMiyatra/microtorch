@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MicroTorch - Lightweight Tensor Autograd Engine from Scratch</title>
+  <link rel="icon" href="https://github.githubassets.com/favicons/favicon.svg" type="image/svg+xml">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-muted: #8b949e;
+      --primary: #f78166;
+      --accent: #58a6ff;
+      --code-bg: #0a0d12;
+      --success: #3fb950;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 0;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      background: linear-gradient(180deg, #161b22 0%, #0d1117 100%);
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.6rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border-radius: 20px;
+      background: rgba(247, 129, 102, 0.15);
+      color: var(--primary);
+      border: 1px solid rgba(247, 129, 102, 0.3);
+      margin-bottom: 1rem;
+    }
+    h1 { font-size: 2.5rem; color: #fff; margin-bottom: 0.5rem; }
+    .subtitle { color: var(--text-muted); font-size: 1.15rem; max-width: 700px; margin: 0 auto 1.5rem; }
+    .nav-links a {
+      color: var(--accent);
+      text-decoration: none;
+      margin: 0 0.8rem;
+      font-weight: 500;
+    }
+    .nav-links a:hover { text-decoration: underline; }
+    .container { max-width: 900px; margin: 2rem auto; padding: 0 1.5rem; }
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.25rem;
+      margin: 2rem 0;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+    .card h3 { color: #fff; margin-bottom: 0.5rem; font-size: 1.1rem; }
+    .card p { color: var(--text-muted); font-size: 0.95rem; }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.9rem;
+      margin: 1.25rem 0;
+      color: #e6edf3;
+    }
+    .btn {
+      display: inline-block;
+      background: #238636;
+      color: #fff;
+      padding: 0.6rem 1.25rem;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 600;
+      margin-top: 1rem;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: #2ea043; }
+    footer {
+      text-align: center;
+      padding: 2rem;
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin-top: 3rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="badge">v1.0.0 Stable Release</div>
+    <h1>🔥 MicroTorch</h1>
+    <p class="subtitle">A lightweight, zero-dependency tensor autograd engine & neural network framework built from scratch in pure Python.</p>
+    <div class="nav-links">
+      <a href="https://github.com/YashrajMiyatra/microtorch" target="_blank">GitHub Repository</a>
+      <a href="https://github.com/YashrajMiyatra" target="_blank">Author Profile</a>
+      <a href="https://dev.to" target="_blank">Dev.to Article</a>
+    </div>
+  </header>
+
+  <div class="container">
+    <h2>⚡ Quickstart</h2>
+    <p style="color: var(--text-muted); margin-top: 0.5rem;">Clone and train a multi-layer perceptron with AdamW in under 30 lines of code:</p>
+
+    <pre><code>from microtorch import Tensor, Sequential, Linear, ReLU, MSELoss, AdamW
+
+# 1. Define Model Architecture
+model = Sequential(
+    Linear(2, 8),
+    ReLU(),
+    Linear(8, 1)
+)
+
+# 2. Setup AdamW Optimizer with Decoupled Weight Decay
+optimizer = AdamW(model.parameters(), lr=0.05, weight_decay=0.01)
+criterion = MSELoss()
+
+# 3. Training Loop (Reverse-Mode Topological Autograd)
+x = Tensor([[0.5, -1.0], [1.5, 2.0]])
+y = Tensor([[1.0], [3.0]])
+
+for epoch in range(100):
+    optimizer.zero_grad()
+    loss = criterion(model(x), y)
+    loss.backward()
+    optimizer.step()
+
+print(f"Final Trained Loss: {loss.item():.6f}")</code></pre>
+
+    <h2 style="margin-top: 2.5rem;">🏗️ Core Capabilities</h2>
+    <div class="card-grid">
+      <div class="card">
+        <h3>⚡ Reverse-Mode Autograd</h3>
+        <p>Dynamic computational graph construction with topological sort backward propagation across all tensor nodes.</p>
+      </div>
+      <div class="card">
+        <h3>📐 N-Dimensional Tensors</h3>
+        <p>Full matrix multiplication (<code>@</code>), automatic broadcasting, and reduction operators (<code>sum</code>, <code>mean</code>).</p>
+      </div>
+      <div class="card">
+        <h3>🧠 PyTorch-Style nn Library</h3>
+        <p>Drop-in modular abstractions: <code>Module</code>, <code>Linear</code>, <code>Sequential</code>, <code>ReLU</code>, <code>Sigmoid</code>, <code>Tanh</code>, and loss functions.</p>
+      </div>
+      <div class="card">
+        <h3>🚀 First-Class Optimizers</h3>
+        <p>Includes <code>SGD</code> (with momentum), <code>Adam</code> (adaptive moments), and <code>AdamW</code> (decoupled weight decay).</p>
+      </div>
+    </div>
+
+    <div style="text-align: center; margin: 3rem 0;">
+      <a href="https://github.com/YashrajMiyatra/microtorch" class="btn">View on GitHub & Star the Project ⭐️</a>
+    </div>
+  </div>
+
+  <footer>
+    <p>Crafted by <strong>Yashraj Miyatra</strong> • MIT Licensed Open Source Project</p>
+  </footer>
+</body>
+</html>
