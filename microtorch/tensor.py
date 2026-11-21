@@ -2,6 +2,11 @@
 MicroTorch Core Tensor Engine.
 Provides multi-dimensional Tensors with reverse-mode automatic differentiation (Autograd).
 Zero external dependencies required.
+
+Mathematical Autograd Architecture:
+- Forward pass constructs dynamic computation DAG nodes on the fly.
+- Reverse-mode backward pass topologically sorts DAG nodes via Kahn's / DFS algorithm.
+- Multi-dimensional gradient broadcasting propagates adjoint vectors across matrix operations.
 """
 
 from __future__ import annotations
