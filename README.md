@@ -4,6 +4,7 @@
 
 ### A Lightweight, Zero-Dependency Tensor Autograd Engine & Neural Network Framework from Scratch
 
+[![CI](https://github.com/YashrajMiyatra/microtorch/actions/workflows/ci.yml/badge.svg)](https://github.com/YashrajMiyatra/microtorch/actions)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Dependencies](https://img.shields.io/badge/dependencies-zero-success.svg)](https://github.com)
