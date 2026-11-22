@@ -6,7 +6,7 @@ Defines base Module, Parameters, Layers (Linear, Sequential, Activations), and L
 from __future__ import annotations
 import math
 from typing import Any, List, Optional
-from .tensor import Tensor
+from .tensor import Tensor, _unflatten
 
 
 class Parameter(Tensor):
@@ -151,3 +151,135 @@ class CrossEntropyLoss(Module):
 
         out._backward = _backward
         return out
+
+
+class Softmax(Module):
+    """Row-wise Softmax activation for 2D tensors."""
+
+    def forward(self, x: Tensor) -> Tensor:
+        if len(x.shape) != 2:
+            raise ValueError(f"Softmax expects a 2D tensor, got {x.shape}")
+        M, N = x.shape
+        out_flat = [0.0] * (M * N)
+        for i in range(M):
+            row = x._flat[i * N : (i + 1) * N]
+            max_val = max(row)
+            exps = [math.exp(v - max_val) for v in row]
+            sum_exp = sum(exps)
+            for j in range(N):
+                out_flat[i * N + j] = exps[j] / sum_exp
+
+        out = Tensor(
+            _unflatten(out_flat, (M, N)),
+            requires_grad=x.requires_grad,
+            _children=(x,),
+            _op="Softmax",
+        )
+
+        def _backward():
+            if x.requires_grad:
+                if x.grad is None:
+                    x.grad = Tensor.zeros(*x.shape)
+                for i in range(M):
+                    s = out._flat[i * N : (i + 1) * N]
+                    g = out.grad._flat[i * N : (i + 1) * N]
+                    dot = sum(s[k] * g[k] for k in range(N))
+                    for j in range(N):
+                        x.grad._flat[i * N + j] += s[j] * (g[j] - dot)
+
+        out._backward = _backward
+        return out
+
+
+class LayerNorm(Module):
+    """
+    Layer Normalization over the last feature dimension:
+    y = ((x - E[x]) / sqrt(Var[x] + eps)) * gamma + beta
+    """
+
+    def __init__(self, normalized_shape: int, eps: float = 1e-5) -> None:
+        self.normalized_shape = normalized_shape
+        self.eps = eps
+        self.gamma = Parameter(Tensor.ones(1, normalized_shape).data)
+        self.beta = Parameter(Tensor.zeros(1, normalized_shape).data)
+
+    def forward(self, x: Tensor) -> Tensor:
+        if len(x.shape) != 2:
+            raise ValueError(f"LayerNorm requires a 2D tensor, got {x.shape}")
+        M, N = x.shape
+        if N != self.normalized_shape:
+            raise ValueError(f"Expected last dimension {self.normalized_shape}, got {N}")
+
+        out_flat = [0.0] * (M * N)
+        for i in range(M):
+            row = x._flat[i * N : (i + 1) * N]
+            mean = sum(row) / N
+            var = sum((v - mean) ** 2 for v in row) / N
+            std = math.sqrt(var + self.eps)
+            for j in range(N):
+                norm = (row[j] - mean) / std
+                out_flat[i * N + j] = norm * self.gamma._flat[j] + self.beta._flat[j]
+
+        from .tensor import _unflatten
+        out = Tensor(_unflatten(out_flat, (M, N)), requires_grad=True, _children=(x, self.gamma, self.beta), _op="LayerNorm")
+
+        def _backward():
+            for i in range(M):
+                row = x._flat[i * N : (i + 1) * N]
+                mean = sum(row) / N
+                var = sum((v - mean) ** 2 for v in row) / N
+                std = math.sqrt(var + self.eps)
+                dout = out.grad._flat[i * N : (i + 1) * N]
+                dnorm = [dout[j] * self.gamma._flat[j] for j in range(N)]
+
+                if self.gamma.requires_grad:
+                    if self.gamma.grad is None:
+                        self.gamma.grad = Tensor.zeros(1, N)
+                    for j in range(N):
+                        self.gamma.grad._flat[j] += dout[j] * ((row[j] - mean) / std)
+
+                if self.beta.requires_grad:
+                    if self.beta.grad is None:
+                        self.beta.grad = Tensor.zeros(1, N)
+                    for j in range(N):
+                        self.beta.grad._flat[j] += dout[j]
+
+                if x.requires_grad:
+                    if x.grad is None:
+                        x.grad = Tensor.zeros(*x.shape)
+                    sum_dnorm = sum(dnorm)
+                    sum_dnorm_x = sum(dnorm[j] * (row[j] - mean) for j in range(N))
+                    for j in range(N):
+                        dx = (1.0 / (N * std)) * (N * dnorm[j] - sum_dnorm - ((row[j] - mean) / (std ** 2)) * sum_dnorm_x)
+                        x.grad._flat[i * N + j] += dx
+
+        out._backward = _backward
+        return out
+
+
+class MultiHeadAttention(Module):
+    """
+    Scaled Dot-Product Multi-Head Self-Attention primitive for sequence modeling:
+    Attention(Q, K, V) = Softmax(Q K^T / sqrt(d_k)) V
+    """
+
+    def __init__(self, d_model: int, n_heads: int = 1) -> None:
+        self.d_model = d_model
+        self.n_heads = n_heads
+        self.q_proj = Linear(d_model, d_model)
+        self.k_proj = Linear(d_model, d_model)
+        self.v_proj = Linear(d_model, d_model)
+        self.out_proj = Linear(d_model, d_model)
+        self.softmax = Softmax()
+
+    def forward(self, x: Tensor) -> Tensor:
+        """Forward pass for self-attention on sequence tensor (SeqLen, DModel)."""
+        Q = self.q_proj(x)
+        K = self.k_proj(x)
+        V = self.v_proj(x)
+
+        scale = 1.0 / math.sqrt(self.d_model)
+        scores = (Q @ K.T) * scale
+        weights = self.softmax(scores)
+        context = weights @ V
+        return self.out_proj(context)

@@ -5,7 +5,20 @@ MicroTorch: A lightweight, clean Tensor Autograd engine and Neural Network frame
 __version__ = "1.0.0"
 
 from .tensor import Tensor
-from .nn import Module, Parameter, Linear, Sequential, ReLU, Sigmoid, Tanh, MSELoss, CrossEntropyLoss
+from .nn import (
+    Module,
+    Parameter,
+    Linear,
+    Sequential,
+    ReLU,
+    Sigmoid,
+    Tanh,
+    Softmax,
+    LayerNorm,
+    MultiHeadAttention,
+    MSELoss,
+    CrossEntropyLoss,
+)
 from .optim import SGD, Adam, AdamW
 from .viz import to_mermaid, to_ascii_tree
 
@@ -18,6 +31,9 @@ __all__ = [
     "ReLU",
     "Sigmoid",
     "Tanh",
+    "Softmax",
+    "LayerNorm",
+    "MultiHeadAttention",
     "MSELoss",
     "CrossEntropyLoss",
     "SGD",
