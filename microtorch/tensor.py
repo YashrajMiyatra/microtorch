@@ -340,6 +340,33 @@ class Tensor:
     def __matmul__(self, other: Tensor) -> Tensor:
         return self.matmul(other)
 
+    def transpose(self) -> Tensor:
+        """Transposes a 2D tensor: (M, N) -> (N, M)."""
+        if len(self.shape) != 2:
+            raise ValueError(f"transpose requires a 2D tensor, got shape {self.shape}")
+        M, N = self.shape
+        out_flat = [0.0] * (M * N)
+        for i in range(M):
+            for j in range(N):
+                out_flat[j * M + i] = self._flat[i * N + j]
+        out = Tensor(_unflatten(out_flat, (N, M)), requires_grad=self.requires_grad, _children=(self,), _op="T")
+
+        def _backward():
+            if self.requires_grad:
+                if self.grad is None:
+                    self.grad = Tensor.zeros(*self.shape)
+                for i in range(M):
+                    for j in range(N):
+                        self.grad._flat[i * N + j] += out.grad._flat[j * M + i]
+
+        out._backward = _backward
+        return out
+
+    @property
+    def T(self) -> Tensor:
+        """Shorthand transpose property: A.T."""
+        return self.transpose()
+
     # ------------------ Non-linearities & Reductions ------------------ #
 
     def relu(self) -> Tensor:
