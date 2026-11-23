@@ -20,6 +20,7 @@ from .nn import (
     CrossEntropyLoss,
 )
 from .optim import SGD, Adam, AdamW
+from .lr_scheduler import StepLR, ExponentialLR, CosineAnnealingLR
 from .viz import to_mermaid, to_ascii_tree
 
 __all__ = [
@@ -39,6 +40,9 @@ __all__ = [
     "SGD",
     "Adam",
     "AdamW",
+    "StepLR",
+    "ExponentialLR",
+    "CosineAnnealingLR",
     "to_mermaid",
     "to_ascii_tree",
 ]
