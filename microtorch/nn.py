@@ -19,6 +19,25 @@ class Parameter(Tensor):
 class Module:
     """Base class for all neural network modules."""
 
+    def __init__(self) -> None:
+        self.training = True
+
+    def train(self, mode: bool = True) -> Module:
+        """Sets the module in training or evaluation mode."""
+        self.training = mode
+        for _, value in self.__dict__.items():
+            if isinstance(value, Module):
+                value.train(mode)
+            elif isinstance(value, list):
+                for item in value:
+                    if isinstance(item, Module):
+                        item.train(mode)
+        return self
+
+    def eval(self) -> Module:
+        """Sets the module in evaluation mode."""
+        return self.train(False)
+
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         return self.forward(*args, **kwargs)
 
@@ -139,6 +158,7 @@ class Sequential(Module):
     """Chains multiple modules sequentially."""
 
     def __init__(self, *layers: Module) -> None:
+        super().__init__()
         self.layers = list(layers)
 
     def forward(self, x: Tensor) -> Tensor:
@@ -348,3 +368,37 @@ class MultiHeadAttention(Module):
         weights = self.softmax(scores)
         context = weights @ V
         return self.out_proj(context)
+
+
+class Dropout(Module):
+    """
+    Applies Inverted Dropout to input tensor:
+    Zeroes elements with probability p during training and scales remaining activations by 1 / (1 - p).
+    Acts as identity in eval() mode.
+    """
+
+    def __init__(self, p: float = 0.5) -> None:
+        super().__init__()
+        if not 0.0 <= p < 1.0:
+            raise ValueError(f"Dropout probability p must be in [0, 1), got {p}")
+        self.p = p
+
+    def forward(self, x: Tensor) -> Tensor:
+        if not self.training or self.p == 0.0:
+            return x
+
+        import random
+        scale = 1.0 / (1.0 - self.p)
+        mask = [1.0 if random.random() >= self.p else 0.0 for _ in range(len(x._flat))]
+        out_flat = [v * m * scale for v, m in zip(x._flat, mask)]
+        out = Tensor(_unflatten(out_flat, x.shape), requires_grad=x.requires_grad, _children=(x,), _op="Dropout")
+
+        def _backward():
+            if x.requires_grad:
+                if x.grad is None:
+                    x.grad = Tensor.zeros(*x.shape)
+                for i in range(len(x._flat)):
+                    x.grad._flat[i] += out.grad._flat[i] * mask[i] * scale
+
+        out._backward = _backward
+        return out

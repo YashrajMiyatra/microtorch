@@ -16,6 +16,7 @@ from .nn import (
     Softmax,
     LayerNorm,
     MultiHeadAttention,
+    Dropout,
     MSELoss,
     CrossEntropyLoss,
 )
@@ -35,6 +36,7 @@ __all__ = [
     "Softmax",
     "LayerNorm",
     "MultiHeadAttention",
+    "Dropout",
     "MSELoss",
     "CrossEntropyLoss",
     "SGD",
