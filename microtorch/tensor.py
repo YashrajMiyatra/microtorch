@@ -89,6 +89,17 @@ class Tensor:
     def data(self) -> Any:
         return _unflatten(self._flat, self.shape)
 
+    @data.setter
+    def data(self, new_data: Any) -> None:
+        if isinstance(new_data, (int, float, list)):
+            self.shape = _shape_of(new_data)
+            self._flat = _flatten(new_data)
+        elif isinstance(new_data, Tensor):
+            self.shape = new_data.shape
+            self._flat = list(new_data._flat)
+        else:
+            raise TypeError(f"Invalid tensor data assignment: {type(new_data)}")
+
     @classmethod
     def zeros(cls, *shape: int, requires_grad: bool = False) -> Tensor:
         flat = _zeros(shape)

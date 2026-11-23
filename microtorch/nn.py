@@ -44,6 +44,71 @@ class Module:
         for p in self.parameters():
             p.zero_grad()
 
+    def state_dict(self, prefix: str = "") -> dict[str, Any]:
+        """Returns a dictionary containing a whole state of the module."""
+        state = {}
+        for name, value in self.__dict__.items():
+            full_name = f"{prefix}{name}" if prefix else name
+            if isinstance(value, Parameter):
+                state[full_name] = value.data
+            elif isinstance(value, Module):
+                state.update(value.state_dict(prefix=f"{full_name}."))
+            elif isinstance(value, list):
+                for idx, item in enumerate(value):
+                    item_prefix = f"{full_name}.{idx}."
+                    if isinstance(item, Module):
+                        state.update(item.state_dict(prefix=item_prefix))
+                    elif isinstance(item, Parameter):
+                        state[f"{full_name}.{idx}"] = item.data
+        return state
+
+    def load_state_dict(self, state_dict: dict[str, Any], strict: bool = True) -> None:
+        """Copies parameters from state_dict into this module and its descendants."""
+        curr_state = self.state_dict()
+        if strict:
+            missing = set(curr_state.keys()) - set(state_dict.keys())
+            unexpected = set(state_dict.keys()) - set(curr_state.keys())
+            if missing or unexpected:
+                raise KeyError(f"Error loading state_dict: missing={missing}, unexpected={unexpected}")
+
+        def _assign(mod: Module, prefix: str):
+            for name, value in mod.__dict__.items():
+                full_name = f"{prefix}{name}" if prefix else name
+                if isinstance(value, Parameter) and full_name in state_dict:
+                    new_val = state_dict[full_name]
+                    # Update parameter data in-place
+                    value.data = new_val
+                    value.shape = Parameter(new_val).shape
+                    value._flat = Parameter(new_val)._flat
+                elif isinstance(value, Module):
+                    _assign(value, prefix=f"{full_name}.")
+                elif isinstance(value, list):
+                    for idx, item in enumerate(value):
+                        item_prefix = f"{full_name}.{idx}"
+                        if isinstance(item, Parameter) and item_prefix in state_dict:
+                            new_val = state_dict[item_prefix]
+                            item.data = new_val
+                            item.shape = Parameter(new_val).shape
+                            item._flat = Parameter(new_val)._flat
+                        elif isinstance(item, Module):
+                            _assign(item, prefix=f"{item_prefix}.")
+
+        _assign(self, "")
+
+    def save(self, filepath: str) -> None:
+        """Saves model state_dict to a JSON checkpoint."""
+        import json, os
+        os.makedirs(os.path.dirname(os.path.abspath(filepath)), exist_ok=True)
+        with open(filepath, "w") as f:
+            json.dump(self.state_dict(), f, indent=2)
+
+    def load(self, filepath: str) -> None:
+        """Loads model state_dict from a JSON checkpoint."""
+        import json
+        with open(filepath, "r") as f:
+            state = json.load(f)
+        self.load_state_dict(state)
+
 
 class Linear(Module):
     """Fully connected linear layer: Y = X @ W + b."""
