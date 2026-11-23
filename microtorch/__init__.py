@@ -20,6 +20,7 @@ from .nn import (
     MSELoss,
     CrossEntropyLoss,
     BCEWithLogitsLoss,
+    L1Loss,
 )
 from .optim import SGD, Adam, AdamW
 from .lr_scheduler import StepLR, ExponentialLR, CosineAnnealingLR
@@ -41,6 +42,7 @@ __all__ = [
     "MSELoss",
     "CrossEntropyLoss",
     "BCEWithLogitsLoss",
+    "L1Loss",
     "SGD",
     "Adam",
     "AdamW",

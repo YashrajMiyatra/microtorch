@@ -435,6 +435,47 @@ class BCEWithLogitsLoss(Module):
                     y = target._flat[i]
                     sig = 1.0 / (1.0 + math.exp(-x)) if x >= 0 else math.exp(x) / (1.0 + math.exp(x))
                     pred.grad._flat[i] += out.grad._flat[0] * (sig - y) / n
+        out._backward = _backward
+        return out
+
+
+class L1Loss(Module):
+    """
+    Mean Absolute Error (L1) loss:
+    loss = (1/N) * sum(|pred - target|) (if reduction == 'mean')
+    loss = sum(|pred - target|) (if reduction == 'sum')
+    Gradient:
+    d(loss)/dx = sign(pred - target) / N (or sign(pred - target) for sum)
+    """
+
+    def __init__(self, reduction: str = "mean") -> None:
+        super().__init__()
+        if reduction not in ("mean", "sum"):
+            raise ValueError(f"Invalid reduction mode: {reduction}. Supported: 'mean', 'sum'")
+        self.reduction = reduction
+
+    def forward(self, pred: Tensor, target: Tensor) -> Tensor:
+        if pred.shape != target.shape:
+            raise ValueError(f"Shape mismatch: pred shape {pred.shape} vs target shape {target.shape}")
+
+        n = len(pred._flat)
+        diffs = [p - t for p, t in zip(pred._flat, target._flat)]
+        abs_diffs = [abs(d) for d in diffs]
+        total_loss = sum(abs_diffs)
+        loss_val = (total_loss / n) if self.reduction == "mean" else total_loss
+
+        out = Tensor(loss_val, requires_grad=pred.requires_grad, _children=(pred,), _op="L1Loss")
+
+        def _backward():
+            if pred.requires_grad:
+                if pred.grad is None:
+                    pred.grad = Tensor.zeros(*pred.shape)
+                scale = (1.0 / n) if self.reduction == "mean" else 1.0
+                out_g = out.grad._flat[0] if out.grad is not None else 1.0
+                for i in range(n):
+                    d = diffs[i]
+                    sgn = 1.0 if d > 0 else (-1.0 if d < 0 else 0.0)
+                    pred.grad._flat[i] += out_g * sgn * scale
 
         out._backward = _backward
         return out
