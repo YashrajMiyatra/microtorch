@@ -402,3 +402,39 @@ class Dropout(Module):
 
         out._backward = _backward
         return out
+
+
+class BCEWithLogitsLoss(Module):
+    """
+    Binary Cross Entropy with Logits Loss.
+    Combines Sigmoid activation and BCELoss using the numerically stable log-sum-exp formulation:
+    loss = max(x, 0) - x * y + log(1 + exp(-|x|))
+    Gradient:
+    d(loss) / dx = (sigmoid(x) - y) / N
+    """
+
+    def forward(self, pred: Tensor, target: Tensor) -> Tensor:
+        if pred.shape != target.shape:
+            raise ValueError(f"Shape mismatch: pred shape {pred.shape} vs target shape {target.shape}")
+
+        n = len(pred._flat)
+        loss_sum = 0.0
+        for x, y in zip(pred._flat, target._flat):
+            m = max(x, 0.0)
+            loss_sum += m - x * y + math.log(1.0 + math.exp(-abs(x)))
+
+        mean_loss = loss_sum / n
+        out = Tensor(mean_loss, requires_grad=pred.requires_grad, _children=(pred,), _op="BCEWithLogits")
+
+        def _backward():
+            if pred.requires_grad:
+                if pred.grad is None:
+                    pred.grad = Tensor.zeros(*pred.shape)
+                for i in range(n):
+                    x = pred._flat[i]
+                    y = target._flat[i]
+                    sig = 1.0 / (1.0 + math.exp(-x)) if x >= 0 else math.exp(x) / (1.0 + math.exp(x))
+                    pred.grad._flat[i] += out.grad._flat[0] * (sig - y) / n
+
+        out._backward = _backward
+        return out
