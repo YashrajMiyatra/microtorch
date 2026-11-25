@@ -476,6 +476,60 @@ class L1Loss(Module):
                     d = diffs[i]
                     sgn = 1.0 if d > 0 else (-1.0 if d < 0 else 0.0)
                     pred.grad._flat[i] += out_g * sgn * scale
+        out._backward = _backward
+        return out
+
+
+class SmoothL1Loss(Module):
+    """
+    Smooth L1 (Huber) Loss with threshold beta:
+    If |x - y| < beta: 0.5 * (x - y)^2 / beta
+    Else: |x - y| - 0.5 * beta
+    Gradient:
+    If |x - y| < beta: (x - y) / (beta * N)
+    Else: sign(x - y) / N
+    """
+
+    def __init__(self, beta: float = 1.0, reduction: str = "mean") -> None:
+        super().__init__()
+        if beta <= 0.0:
+            raise ValueError(f"beta must be strictly positive, got {beta}")
+        if reduction not in ("mean", "sum"):
+            raise ValueError(f"Invalid reduction mode: {reduction}. Supported: 'mean', 'sum'")
+        self.beta = beta
+        self.reduction = reduction
+
+    def forward(self, pred: Tensor, target: Tensor) -> Tensor:
+        if pred.shape != target.shape:
+            raise ValueError(f"Shape mismatch: pred shape {pred.shape} vs target shape {target.shape}")
+
+        n = len(pred._flat)
+        diffs = [p - t for p, t in zip(pred._flat, target._flat)]
+        losses = []
+        for d in diffs:
+            ad = abs(d)
+            if ad < self.beta:
+                losses.append(0.5 * (d * d) / self.beta)
+            else:
+                losses.append(ad - 0.5 * self.beta)
+
+        total_loss = sum(losses)
+        loss_val = (total_loss / n) if self.reduction == "mean" else total_loss
+        out = Tensor(loss_val, requires_grad=pred.requires_grad, _children=(pred,), _op="SmoothL1Loss")
+
+        def _backward():
+            if pred.requires_grad:
+                if pred.grad is None:
+                    pred.grad = Tensor.zeros(*pred.shape)
+                scale = (1.0 / n) if self.reduction == "mean" else 1.0
+                out_g = out.grad._flat[0] if out.grad is not None else 1.0
+                for i in range(n):
+                    d = diffs[i]
+                    if abs(d) < self.beta:
+                        grad_d = d / self.beta
+                    else:
+                        grad_d = 1.0 if d > 0 else (-1.0 if d < 0 else 0.0)
+                    pred.grad._flat[i] += out_g * grad_d * scale
 
         out._backward = _backward
         return out
