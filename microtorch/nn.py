@@ -679,3 +679,67 @@ class TripletMarginLoss(Module):
 
         out._backward = _backward
         return out
+
+
+class LabelSmoothingCrossEntropyLoss(Module):
+    """
+    Cross Entropy Loss with Label Smoothing regularization:
+    q(k) = (1 - smoothing) * I(k == target) + smoothing / K
+    L = - sum_k q(k) * log(softmax(logits)_k)
+    """
+
+    def __init__(self, smoothing: float = 0.1, reduction: str = "mean") -> None:
+        super().__init__()
+        if not (0.0 <= smoothing < 1.0):
+            raise ValueError(f"smoothing must be in [0, 1), got {smoothing}")
+        self.smoothing = smoothing
+        self.reduction = reduction
+
+    def forward(self, logits: Tensor, target: Tensor) -> Tensor:
+        # logits shape: (N, K) or (K,)
+        if len(logits.shape) == 1:
+            batch_logits = [logits._flat]
+            targets = [int(target._flat[0])]
+        else:
+            n_batch = logits.shape[0]
+            k_classes = logits.shape[1]
+            batch_logits = [logits._flat[i * k_classes : (i + 1) * k_classes] for i in range(n_batch)]
+            targets = [int(t) for t in target._flat]
+
+        n = len(batch_logits)
+        k = len(batch_logits[0])
+        total_loss = 0.0
+        all_probs = []
+
+        for row, y in zip(batch_logits, targets):
+            max_val = max(row)
+            exp_row = [math.exp(v - max_val) for v in row]
+            sum_exp = sum(exp_row)
+            probs = [e / sum_exp for e in exp_row]
+            all_probs.append(probs)
+
+            # q(i) = (1 - alpha) * (1 if i == y else 0) + alpha / k
+            log_probs = [math.log(max(p, 1e-12)) for p in probs]
+            loss_i = 0.0
+            for i in range(k):
+                q_i = ((1.0 - self.smoothing) if i == y else 0.0) + (self.smoothing / k)
+                loss_i -= q_i * log_probs[i]
+            total_loss += loss_i
+
+        loss_val = (total_loss / n) if self.reduction == "mean" else total_loss
+        out = Tensor(loss_val, requires_grad=logits.requires_grad, _children=(logits,), _op="LabelSmoothingCrossEntropyLoss")
+
+        def _backward():
+            out_g = out.grad._flat[0] if out.grad is not None else 1.0
+            scale = (out_g / n) if self.reduction == "mean" else out_g
+            if logits.requires_grad:
+                if logits.grad is None:
+                    logits.grad = Tensor.zeros(*logits.shape)
+                for b_idx, (probs, y) in enumerate(zip(all_probs, targets)):
+                    for i in range(k):
+                        q_i = ((1.0 - self.smoothing) if i == y else 0.0) + (self.smoothing / k)
+                        grad_z = probs[i] - q_i
+                        logits.grad._flat[b_idx * k + i] += grad_z * scale
+
+        out._backward = _backward
+        return out
