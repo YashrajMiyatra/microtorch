@@ -25,6 +25,7 @@ from .nn import (
     CosineSimilarity,
     CosineEmbeddingLoss,
     TripletMarginLoss,
+    LabelSmoothingCrossEntropyLoss,
 )
 from .optim import SGD, Adam, AdamW, clip_grad_norm_, clip_grad_value_
 from .regularization import compute_gradient_penalty
@@ -52,6 +53,7 @@ __all__ = [
     "CosineSimilarity",
     "CosineEmbeddingLoss",
     "TripletMarginLoss",
+    "LabelSmoothingCrossEntropyLoss",
     "SGD",
     "Adam",
     "AdamW",
