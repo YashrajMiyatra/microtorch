@@ -16,6 +16,10 @@ class TestSerialization(unittest.TestCase):
             ReLU(),
             Linear(3, 1)
         )
+        # Ensure positive weights so ReLU activations don't vanish due to random seed
+        m1.layers[0].weight.data = [[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]
+        m1.layers[2].weight.data = [[1.0], [1.0], [1.0]]
+
         state = m1.state_dict()
         self.assertIn("layers.0.weight", state)
         self.assertIn("layers.0.bias", state)
@@ -28,6 +32,9 @@ class TestSerialization(unittest.TestCase):
             ReLU(),
             Linear(3, 1)
         )
+        m2.layers[0].weight.data = [[2.0, 2.0, 2.0], [2.0, 2.0, 2.0]]
+        m2.layers[2].weight.data = [[2.0], [2.0], [2.0]]
+
         x = Tensor([[1.0, 2.0]])
         out1 = m1(x)
         out2_before = m2(x)
