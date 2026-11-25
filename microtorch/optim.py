@@ -122,3 +122,48 @@ class AdamW(Optimizer):
                 # Update parameter
                 p._flat[i] -= self.lr * m_hat / (math.sqrt(v_hat) + self.eps)
 
+
+def clip_grad_norm_(parameters: List[Parameter], max_norm: float, norm_type: float = 2.0) -> float:
+    """
+    Clips gradient norm of an iterable of parameters.
+    The norm is computed over all gradients together, as if they were concatenated into a single vector.
+    Gradients are modified in-place.
+    Returns total norm.
+    """
+    params = [p for p in parameters if p.grad is not None]
+    if not params:
+        return 0.0
+
+    max_norm = float(max_norm)
+    norm_type = float(norm_type)
+
+    if math.isinf(norm_type):
+        total_norm = max(max(abs(g) for g in p.grad._flat) for p in params)
+    else:
+        total_norm = 0.0
+        for p in params:
+            for g in p.grad._flat:
+                total_norm += abs(g) ** norm_type
+        total_norm = total_norm ** (1.0 / norm_type)
+
+    clip_coef = max_norm / (total_norm + 1e-6)
+    if clip_coef < 1.0:
+        for p in params:
+            for i in range(len(p.grad._flat)):
+                p.grad._flat[i] *= clip_coef
+
+    return total_norm
+
+
+def clip_grad_value_(parameters: List[Parameter], clip_value: float) -> None:
+    """
+    Clips gradient values of parameters at specified value in-place:
+    grad is clamped to [-clip_value, clip_value].
+    """
+    clip_value = abs(float(clip_value))
+    for p in parameters:
+        if p.grad is None:
+            continue
+        for i in range(len(p.grad._flat)):
+            p.grad._flat[i] = max(-clip_value, min(clip_value, p.grad._flat[i]))
+
