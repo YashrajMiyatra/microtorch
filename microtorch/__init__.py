@@ -26,7 +26,7 @@ from .nn import (
     CosineEmbeddingLoss,
     TripletMarginLoss,
 )
-from .optim import SGD, Adam, AdamW
+from .optim import SGD, Adam, AdamW, clip_grad_norm_, clip_grad_value_
 from .lr_scheduler import StepLR, ExponentialLR, CosineAnnealingLR
 from .viz import to_mermaid, to_ascii_tree
 
@@ -54,6 +54,8 @@ __all__ = [
     "SGD",
     "Adam",
     "AdamW",
+    "clip_grad_norm_",
+    "clip_grad_value_",
     "StepLR",
     "ExponentialLR",
     "CosineAnnealingLR",
