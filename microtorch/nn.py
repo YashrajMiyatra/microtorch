@@ -576,3 +576,47 @@ class CosineSimilarity(Module):
 
         out._backward = _backward
         return out
+
+
+class CosineEmbeddingLoss(Module):
+    """
+    Cosine Embedding Loss:
+    Measures loss given input tensors x1, x2 and label Tensor y (containing 1 or -1).
+    loss(x1, x2, y) = 1 - cos(x1, x2) if y == 1
+                    = max(0, cos(x1, x2) - margin) if y == -1
+    """
+
+    def __init__(self, margin: float = 0.0, reduction: str = "mean", eps: float = 1e-8) -> None:
+        super().__init__()
+        self.margin = margin
+        self.reduction = reduction
+        self.eps = eps
+        self._cos = CosineSimilarity(eps=eps)
+
+    def forward(self, x1: Tensor, x2: Tensor, target: Tensor) -> Tensor:
+        sim = self._cos(x1, x2)
+        y = target._flat[0]
+        if y not in (1.0, -1.0, 1, -1):
+            raise ValueError(f"Target must be 1 or -1, got {y}")
+
+        cos_val = sim._flat[0]
+        if y == 1:
+            loss_val = 1.0 - cos_val
+        else:
+            loss_val = max(0.0, cos_val - self.margin)
+
+        out = Tensor(loss_val, requires_grad=sim.requires_grad, _children=(sim,), _op="CosineEmbeddingLoss")
+
+        def _backward():
+            out_g = out.grad._flat[0] if out.grad is not None else 1.0
+            if sim.requires_grad:
+                if sim.grad is None:
+                    sim.grad = Tensor.zeros(*sim.shape)
+                if y == 1:
+                    sim.grad._flat[0] += -1.0 * out_g
+                else:
+                    if cos_val > self.margin:
+                        sim.grad._flat[0] += 1.0 * out_g
+
+        out._backward = _backward
+        return out
