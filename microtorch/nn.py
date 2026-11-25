@@ -530,6 +530,49 @@ class SmoothL1Loss(Module):
                     else:
                         grad_d = 1.0 if d > 0 else (-1.0 if d < 0 else 0.0)
                     pred.grad._flat[i] += out_g * grad_d * scale
+        out._backward = _backward
+        return out
+
+
+class CosineSimilarity(Module):
+    """
+    Computes cosine similarity between tensors along the flattened dimension:
+    sim(x1, x2) = (x1 . x2) / (max(||x1||_2, eps) * max(||x2||_2, eps))
+    """
+
+    def __init__(self, eps: float = 1e-8) -> None:
+        super().__init__()
+        self.eps = eps
+
+    def forward(self, x1: Tensor, x2: Tensor) -> Tensor:
+        if x1.shape != x2.shape:
+            raise ValueError(f"Shape mismatch: x1 shape {x1.shape} vs x2 shape {x2.shape}")
+
+        dot = sum(a * b for a, b in zip(x1._flat, x2._flat))
+        norm1 = math.sqrt(sum(a * a for a in x1._flat))
+        norm2 = math.sqrt(sum(b * b for b in x2._flat))
+        denom = max(norm1 * norm2, self.eps)
+        sim = dot / denom
+
+        out = Tensor(sim, requires_grad=(x1.requires_grad or x2.requires_grad), _children=(x1, x2), _op="CosineSimilarity")
+
+        def _backward():
+            out_g = out.grad._flat[0] if out.grad is not None else 1.0
+            if x1.requires_grad:
+                if x1.grad is None:
+                    x1.grad = Tensor.zeros(*x1.shape)
+                for i in range(len(x1._flat)):
+                    term1 = x2._flat[i] / denom
+                    term2 = (dot * x1._flat[i]) / (max(norm1 ** 3 * norm2, self.eps))
+                    x1.grad._flat[i] += out_g * (term1 - term2)
+
+            if x2.requires_grad:
+                if x2.grad is None:
+                    x2.grad = Tensor.zeros(*x2.shape)
+                for i in range(len(x2._flat)):
+                    term1 = x1._flat[i] / denom
+                    term2 = (dot * x2._flat[i]) / (max(norm2 ** 3 * norm1, self.eps))
+                    x2.grad._flat[i] += out_g * (term1 - term2)
 
         out._backward = _backward
         return out

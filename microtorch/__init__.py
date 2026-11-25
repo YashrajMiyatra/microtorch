@@ -22,6 +22,7 @@ from .nn import (
     BCEWithLogitsLoss,
     L1Loss,
     SmoothL1Loss,
+    CosineSimilarity,
 )
 from .optim import SGD, Adam, AdamW
 from .lr_scheduler import StepLR, ExponentialLR, CosineAnnealingLR
@@ -45,6 +46,7 @@ __all__ = [
     "BCEWithLogitsLoss",
     "L1Loss",
     "SmoothL1Loss",
+    "CosineSimilarity",
     "SGD",
     "Adam",
     "AdamW",
