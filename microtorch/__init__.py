@@ -24,6 +24,7 @@ from .nn import (
     SmoothL1Loss,
     CosineSimilarity,
     CosineEmbeddingLoss,
+    TripletMarginLoss,
 )
 from .optim import SGD, Adam, AdamW
 from .lr_scheduler import StepLR, ExponentialLR, CosineAnnealingLR
@@ -49,6 +50,7 @@ __all__ = [
     "SmoothL1Loss",
     "CosineSimilarity",
     "CosineEmbeddingLoss",
+    "TripletMarginLoss",
     "SGD",
     "Adam",
     "AdamW",

@@ -620,3 +620,62 @@ class CosineEmbeddingLoss(Module):
 
         out._backward = _backward
         return out
+
+
+class TripletMarginLoss(Module):
+    """
+    Triplet Margin Loss for metric learning:
+    L(a, p, n) = max(0, d(a, p) - d(a, n) + margin)
+    where d(x, y) is Euclidean distance.
+    """
+
+    def __init__(self, margin: float = 1.0, eps: float = 1e-8) -> None:
+        super().__init__()
+        self.margin = margin
+        self.eps = eps
+
+    def forward(self, anchor: Tensor, positive: Tensor, negative: Tensor) -> Tensor:
+        if anchor.shape != positive.shape or anchor.shape != negative.shape:
+            raise ValueError(f"Shape mismatch: anchor {anchor.shape}, pos {positive.shape}, neg {negative.shape}")
+
+        d_ap_sq = sum((a - p) ** 2 for a, p in zip(anchor._flat, positive._flat))
+        d_an_sq = sum((a - n) ** 2 for a, n in zip(anchor._flat, negative._flat))
+        d_ap = math.sqrt(d_ap_sq + self.eps)
+        d_an = math.sqrt(d_an_sq + self.eps)
+
+        val = d_ap - d_an + self.margin
+        loss_val = max(0.0, val)
+
+        out = Tensor(
+            loss_val,
+            requires_grad=(anchor.requires_grad or positive.requires_grad or negative.requires_grad),
+            _children=(anchor, positive, negative),
+            _op="TripletMarginLoss"
+        )
+
+        def _backward():
+            out_g = out.grad._flat[0] if out.grad is not None else 1.0
+            if loss_val > 0.0:
+                if anchor.requires_grad:
+                    if anchor.grad is None:
+                        anchor.grad = Tensor.zeros(*anchor.shape)
+                    for i in range(len(anchor._flat)):
+                        g = (anchor._flat[i] - positive._flat[i]) / d_ap - (anchor._flat[i] - negative._flat[i]) / d_an
+                        anchor.grad._flat[i] += out_g * g
+
+                if positive.requires_grad:
+                    if positive.grad is None:
+                        positive.grad = Tensor.zeros(*positive.shape)
+                    for i in range(len(positive._flat)):
+                        g = -(anchor._flat[i] - positive._flat[i]) / d_ap
+                        positive.grad._flat[i] += out_g * g
+
+                if negative.requires_grad:
+                    if negative.grad is None:
+                        negative.grad = Tensor.zeros(*negative.shape)
+                    for i in range(len(negative._flat)):
+                        g = (anchor._flat[i] - negative._flat[i]) / d_an
+                        negative.grad._flat[i] += out_g * g
+
+        out._backward = _backward
+        return out
