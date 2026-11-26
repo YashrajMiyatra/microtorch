@@ -277,3 +277,96 @@ class GradientAccumulator:
         self.step_count = 0
 
 
+class GradScaler:
+    """
+    Dynamic Loss Scaler for training stability and numerical precision management.
+    Multiplies loss by scale factor before backward pass, then unscales gradients,
+    checking for inf/nan gradients and dynamically adjusting scale.
+    """
+    def __init__(
+        self,
+        init_scale: float = 65536.0,
+        growth_factor: float = 2.0,
+        backoff_factor: float = 0.5,
+        growth_interval: int = 2000,
+    ) -> None:
+        if init_scale <= 0:
+            raise ValueError(f"init_scale must be positive, got {init_scale}")
+        if growth_factor <= 1.0:
+            raise ValueError(f"growth_factor must be > 1.0, got {growth_factor}")
+        if not (0.0 < backoff_factor < 1.0):
+            raise ValueError(f"backoff_factor must be in (0, 1), got {backoff_factor}")
+        if growth_interval < 1:
+            raise ValueError(f"growth_interval must be >= 1, got {growth_interval}")
+
+        self._scale = float(init_scale)
+        self.growth_factor = float(growth_factor)
+        self.backoff_factor = float(backoff_factor)
+        self.growth_interval = int(growth_interval)
+        self._growth_tracker = 0
+        self._found_inf = False
+
+    def scale(self, loss: Tensor) -> Tensor:
+        """Scales loss by current scale factor for safe backward propagation."""
+        return loss * self._scale
+
+    def unscale_(self, optimizer: Optimizer) -> bool:
+        """
+        Divides parameter gradients by scale factor in-place.
+        Returns True if all gradients are finite, False if inf/nan was encountered.
+        """
+        inv_scale = 1.0 / self._scale
+        found_inf = False
+
+        for p in optimizer.params:
+            if p.grad is None:
+                continue
+            for i, val in enumerate(p.grad._flat):
+                if math.isnan(val) or math.isinf(val):
+                    found_inf = True
+                    break
+            if found_inf:
+                break
+
+        if not found_inf:
+            for p in optimizer.params:
+                if p.grad is None:
+                    continue
+                for i in range(len(p.grad._flat)):
+                    p.grad._flat[i] *= inv_scale
+
+        self._found_inf = found_inf
+        return not found_inf
+
+    def step(self, optimizer: Optimizer) -> bool:
+        """
+        Unscales gradients and executes optimizer.step() if no inf/nan was found.
+        Returns True if step was executed, False if skipped due to overflow.
+        """
+        finite = self.unscale_(optimizer)
+        if finite:
+            optimizer.step()
+            return True
+        return False
+
+    def update(self) -> None:
+        """
+        Dynamically updates loss scale factor based on gradient check results.
+        Decreases scale if overflow occurred; increases scale after consecutive clean intervals.
+        """
+        if self._found_inf:
+            self._scale *= self.backoff_factor
+            self._growth_tracker = 0
+        else:
+            self._growth_tracker += 1
+            if self._growth_tracker >= self.growth_interval:
+                self._scale *= self.growth_factor
+                self._growth_tracker = 0
+        self._found_inf = False
+
+    def get_scale(self) -> float:
+        """Returns the current loss scale factor."""
+        return self._scale
+
+
+
