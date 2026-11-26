@@ -2,8 +2,10 @@
 MicroTorch Optimizers: SGD (with Momentum), Adam, and AdamW.
 """
 
+from __future__ import annotations
 import math
-from typing import List, Tuple
+from typing import List, Tuple, Optional, Any
+from .tensor import Tensor
 from .nn import Parameter
 
 
