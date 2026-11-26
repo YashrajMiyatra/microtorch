@@ -27,7 +27,7 @@ from .nn import (
     TripletMarginLoss,
     LabelSmoothingCrossEntropyLoss,
 )
-from .optim import SGD, Adam, AdamW, clip_grad_norm_, clip_grad_value_
+from .optim import SGD, Adam, AdamW, Adagrad, clip_grad_norm_, clip_grad_value_
 from .regularization import compute_gradient_penalty
 from .lr_scheduler import StepLR, ExponentialLR, CosineAnnealingLR
 from .viz import to_mermaid, to_ascii_tree
@@ -57,6 +57,7 @@ __all__ = [
     "SGD",
     "Adam",
     "AdamW",
+    "Adagrad",
     "clip_grad_norm_",
     "clip_grad_value_",
     "compute_gradient_penalty",
