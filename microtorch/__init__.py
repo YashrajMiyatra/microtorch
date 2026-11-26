@@ -38,7 +38,7 @@ from .optim import (
     clip_grad_value_,
 )
 from .regularization import compute_gradient_penalty
-from .lr_scheduler import StepLR, ExponentialLR, CosineAnnealingLR
+from .lr_scheduler import StepLR, ExponentialLR, CosineAnnealingLR, CosineAnnealingWarmupLR
 from .viz import to_mermaid, to_ascii_tree
 
 __all__ = [
@@ -75,6 +75,7 @@ __all__ = [
     "StepLR",
     "ExponentialLR",
     "CosineAnnealingLR",
+    "CosineAnnealingWarmupLR",
     "to_mermaid",
     "to_ascii_tree",
 ]
