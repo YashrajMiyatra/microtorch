@@ -2,8 +2,10 @@
 MicroTorch Optimizers: SGD (with Momentum), Adam, and AdamW.
 """
 
+from __future__ import annotations
 import math
-from typing import List, Tuple
+from typing import List, Tuple, Optional, Any
+from .tensor import Tensor
 from .nn import Parameter
 
 
@@ -209,4 +211,69 @@ def clip_grad_value_(parameters: List[Parameter], clip_value: float) -> None:
             continue
         for i in range(len(p.grad._flat)):
             p.grad._flat[i] = max(-clip_value, min(clip_value, p.grad._flat[i]))
+
+
+class GradientAccumulator:
+    """
+    Utility wrapper that accumulates gradients across multiple micro-batches
+    before executing an optimizer step and resetting gradients.
+    
+    This enables training with virtually enlarged effective batch sizes
+    without increasing peak memory usage.
+    """
+    def __init__(
+        self,
+        optimizer: Optimizer,
+        accumulation_steps: int = 4,
+        max_norm: Optional[float] = None,
+    ) -> None:
+        if accumulation_steps < 1:
+            raise ValueError(f"accumulation_steps must be at least 1, got {accumulation_steps}")
+        self.optimizer = optimizer
+        self.accumulation_steps = int(accumulation_steps)
+        self.max_norm = float(max_norm) if max_norm is not None else None
+        self.step_count = 0
+
+    def accumulate(self, loss: Tensor) -> bool:
+        """
+        Scales loss by 1/accumulation_steps, invokes backward(), and conditionally steps
+        the optimizer when accumulation_steps micro-steps are reached.
+        
+        Returns:
+            bool: True if an optimizer update was performed, False otherwise.
+        """
+        scaled_loss = loss / float(self.accumulation_steps)
+        scaled_loss.backward()
+        self.step_count += 1
+
+        if self.step_count % self.accumulation_steps == 0:
+            if self.max_norm is not None:
+                clip_grad_norm_(self.optimizer.params, self.max_norm)
+            self.optimizer.step()
+            self.optimizer.zero_grad()
+            return True
+        return False
+
+    def flush(self) -> bool:
+        """
+        Executes optimizer step on any remaining uncommitted gradients and resets step count.
+        
+        Returns:
+            bool: True if an uncommitted gradient step was executed, False if nothing was pending.
+        """
+        remainder = self.step_count % self.accumulation_steps
+        if remainder != 0:
+            if self.max_norm is not None:
+                clip_grad_norm_(self.optimizer.params, self.max_norm)
+            self.optimizer.step()
+            self.optimizer.zero_grad()
+            self.step_count = 0
+            return True
+        return False
+
+    def zero_grad(self) -> None:
+        """Zeros gradients on underlying optimizer parameters and resets step count."""
+        self.optimizer.zero_grad()
+        self.step_count = 0
+
 
