@@ -123,6 +123,49 @@ class AdamW(Optimizer):
                 p._flat[i] -= self.lr * m_hat / (math.sqrt(v_hat) + self.eps)
 
 
+class Adagrad(Optimizer):
+    """
+    Adagrad Optimizer (Duchi et al., 2011).
+    Adapts learning rate per parameter by dividing by root of accumulated squared gradients:
+    G_t = G_{t-1} + g_t^2
+    theta_t = theta_{t-1} - (lr / (sqrt(G_t) + eps)) * (g_t + weight_decay * theta_{t-1})
+    """
+
+    def __init__(
+        self,
+        params: List[Parameter],
+        lr: float = 0.01,
+        lr_decay: float = 0.0,
+        weight_decay: float = 0.0,
+        initial_accumulator_value: float = 0.0,
+        eps: float = 1e-10,
+    ) -> None:
+        super().__init__(params, lr)
+        self.lr_decay = lr_decay
+        self.weight_decay = weight_decay
+        self.initial_accumulator_value = initial_accumulator_value
+        self.eps = eps
+        self.state_sum = [
+            [initial_accumulator_value] * len(p._flat) for p in self.params
+        ]
+        self.t = 0
+
+    def step(self) -> None:
+        self.t += 1
+        clr = self.lr / (1.0 + (self.t - 1) * self.lr_decay)
+        for idx, p in enumerate(self.params):
+            if p.grad is None:
+                continue
+            state = self.state_sum[idx]
+            for i in range(len(p._flat)):
+                grad = p.grad._flat[i]
+                if self.weight_decay != 0.0:
+                    grad += self.weight_decay * p._flat[i]
+                state[i] += grad * grad
+                std = math.sqrt(state[i]) + self.eps
+                p._flat[i] -= clr * grad / std
+
+
 def clip_grad_norm_(parameters: List[Parameter], max_norm: float, norm_type: float = 2.0) -> float:
     """
     Clips gradient norm of an iterable of parameters.
